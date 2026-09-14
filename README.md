@@ -11,7 +11,7 @@ Following is a table with comparing both methods:
 | Kernel | Gaussian | King [ref] |
 | Parameters | $\sigma$ | $\sigma, \gamma$ |
 | Variabilité | Non ($\sigma=1,\mathrm{km}$) | Oui, le kernel dépend de AOT, RH, $\lambda$ et du mélange d'aérosol |
-| Pré-traitement | Aucun | Oui, on doit calculer $P_\mathrm{5S}(\mathrm{AOT}, \mathrm{RH}, $\lambda$, \mathrm{Mélange d'aérosol})$ |
-| Convolution | Résolution : $240m$ <br> Taille : $15\times15$ <br> Padding : miroir <br> Méthode : Convolution spatiale | Résolution : $120m$ <br> Taille : $999\times999$ <br> Padding : miroir <br> Méthode : FFT linéaire avec padding miroir | 
+| Pré-traitement | Aucun | Oui, on doit calculer $P_\mathrm{5S}(\mathrm{AOT}, \mathrm{RH}, \lambda, \mathrm{Mélange d'aérosol})$ |
+| Convolution | Résolution : $240m$ <br> Taille : $15\times15$ <br> Padding : miroir <br> Méthode : spatiale | Résolution : $120m$ <br> Taille : $999\times999$ <br> Padding : miroir <br> Méthode : FFT linéaire avec padding miroir | 
 
 
