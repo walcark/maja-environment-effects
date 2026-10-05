@@ -1,4 +1,7 @@
-"""Linear 2D convolution computed in the Fourier domain."""
+"""Linear 2D convolution computed in the Fourier domain.
+
+Pytorch allows for fast FFT transforms on either CPU or GPU.
+"""
 
 import torch
 import torch.nn.functional as F
@@ -7,9 +10,8 @@ import torch.nn.functional as F
 def fft_convolve_2d(image: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
     """Convolve an image with a centered kernel, using mirror padding.
 
-    The image is mirror-padded by ``k // 2`` on every side, so that the
-    circular FFT product never wraps real pixels around: the result is a
-    true linear convolution, cropped back to the image shape.
+    The image is mirror-padded by ``k // 2`` on every side. The circular FFT
+    thus never wraps real pixels. The result is a true linear convolution.
 
     Parameters
     ----------

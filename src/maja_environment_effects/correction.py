@@ -7,79 +7,6 @@ from .convolution import fft_convolve_2d
 from .psf import mean_king_psf
 
 
-def toa_to_unif(
-    rho_toa: torch.Tensor,
-    rho_atm: torch.Tensor,
-    tdir_down: torch.Tensor,
-    tdif_down: torch.Tensor,
-    tdir_up: torch.Tensor,
-    tdif_up: torch.Tensor,
-    sph_alb: torch.Tensor,
-) -> torch.Tensor:
-    """Invert the 5S model assuming a uniform surface (``rho_s = rho_env``).
-
-        rho_star = rho_toa - rho_atm
-        t_up = tdir_up + tdif_up
-        t_down = tdir_down + tdif_down
-        rho_unif = rho_star / (sph_alb * rho_star + t_up * t_down)
-
-    Returns
-    -------
-    torch.Tensor
-        Uniform surface reflectance ``rho_unif``.
-    """
-    rho_star = rho_toa - rho_atm
-    t_up_down = (tdir_up + tdif_up) * (tdir_down + tdif_down)
-    return rho_star / (sph_alb * rho_star + t_up_down)
-
-
-def unif_to_surface(
-    rho_unif: torch.Tensor,
-    rho_env: torch.Tensor,
-    tdir_up: torch.Tensor,
-    tdif_up: torch.Tensor,
-    sph_alb: torch.Tensor,
-) -> torch.Tensor:
-    """Retrieve the surface reflectance from ``rho_unif`` and ``rho_env``.
-
-        frac = (1 - sph_alb * rho_env) / (1 - sph_alb * rho_unif)
-        rho_s = (rho_unif * (tdir_up + tdif_up) * frac - rho_env * tdif_up) / tdir_up
-
-    Returns
-    -------
-    torch.Tensor
-        Surface reflectance ``rho_s``.
-    """
-    frac = (1 - rho_env * sph_alb) / (1 - rho_unif * sph_alb)
-    return (rho_unif * (tdir_up + tdif_up) * frac - rho_env * tdif_up) / tdir_up
-
-
-def surface_to_toa(
-    rho_s: torch.Tensor,
-    rho_env: torch.Tensor,
-    rho_atm: torch.Tensor,
-    tdir_down: torch.Tensor,
-    tdif_down: torch.Tensor,
-    tdir_up: torch.Tensor,
-    tdif_up: torch.Tensor,
-    sph_alb: torch.Tensor,
-) -> torch.Tensor:
-    """Apply the 5S forward model with environment effects.
-
-        t_down = tdir_down + tdif_down
-        reflected = tdir_up * rho_s + tdif_up * rho_env
-        rho_toa = rho_atm + t_down * reflected / (1 - sph_alb * rho_env)
-
-    Returns
-    -------
-    torch.Tensor
-        Top-of-atmosphere reflectance ``rho_toa``.
-    """
-    t_down = tdir_down + tdif_down
-    reflected = tdir_up * rho_s + tdif_up * rho_env
-    return rho_atm + t_down * reflected / (1 - sph_alb * rho_env)
-
-
 def correct_scene(
     scene: xr.Dataset,
     luts: dict[str, xr.Dataset],
@@ -87,8 +14,8 @@ def correct_scene(
 ) -> xr.Dataset:
     """Run ``rho_toa -> rho_unif -> rho_env -> rho_s`` on every band.
 
-    The PSF of each band is the King kernel of the scene-mean atmosphere
-    (AOT, RH, band wavelength), with the same shape as the image.
+    The PSF used is the King Kernel of the scene's atmosphere, whose AOT is
+    averaged on the full image.
 
     Parameters
     ----------
@@ -146,3 +73,91 @@ def correct_scene(
         {name: (dims, torch.stack(values).numpy()) for name, values in out.items()},
         coords={c: scene[c] for c in dims},
     )
+
+
+def toa_to_unif(
+    rho_toa: torch.Tensor,
+    rho_atm: torch.Tensor,
+    tdir_down: torch.Tensor,
+    tdif_down: torch.Tensor,
+    tdir_up: torch.Tensor,
+    tdif_up: torch.Tensor,
+    sph_alb: torch.Tensor,
+) -> torch.Tensor:
+    """Invert the 5S model assuming a uniform surface (``rho_s = rho_env``).
+
+    The formula is:
+
+        :: rho_unif = rho_star / (sph_alb * rho_star + t_up * t_down)
+
+    with:
+
+        :: rho_star = rho_toa - rho_atm
+        :: t_up = tdir_up + tdif_up
+        :: t_down = tdir_down + tdif_down
+
+    Returns
+    -------
+    torch.Tensor
+        Uniform surface reflectance ``rho_unif``.
+    """
+    rho_star = rho_toa - rho_atm
+    t_up_down = (tdir_up + tdif_up) * (tdir_down + tdif_down)
+    return rho_star / (sph_alb * rho_star + t_up_down)
+
+
+def unif_to_surface(
+    rho_unif: torch.Tensor,
+    rho_env: torch.Tensor,
+    tdir_up: torch.Tensor,
+    tdif_up: torch.Tensor,
+    sph_alb: torch.Tensor,
+) -> torch.Tensor:
+    """Retrieve the surface reflectance from ``rho_unif`` and ``rho_env``.
+
+    The formula is:
+
+        :: rho_s = (rho_unif * (tdir_up + tdif_up) * frac - rho_env * tdif_up) / tdir_up
+
+    with:
+
+        :: frac = (1 - sph_alb * rho_env) / (1 - sph_alb * rho_unif)
+
+    Returns
+    -------
+    torch.Tensor
+        Surface reflectance ``rho_s``.
+    """
+    frac = (1 - rho_env * sph_alb) / (1 - rho_unif * sph_alb)
+    return (rho_unif * (tdir_up + tdif_up) * frac - rho_env * tdif_up) / tdir_up
+
+
+def surface_to_toa(
+    rho_s: torch.Tensor,
+    rho_env: torch.Tensor,
+    rho_atm: torch.Tensor,
+    tdir_down: torch.Tensor,
+    tdif_down: torch.Tensor,
+    tdir_up: torch.Tensor,
+    tdif_up: torch.Tensor,
+    sph_alb: torch.Tensor,
+) -> torch.Tensor:
+    """Apply the 5S forward model with environment effects.
+
+    The formula is:
+
+        :: rho_toa = rho_atm + t_down * reflected / (1 - sph_alb * rho_env)
+
+    with:
+
+        :: t_down = tdir_down + tdif_down
+        :: reflected = tdir_up * rho_s + tdif_up * rho_env
+
+    Returns
+    -------
+    torch.Tensor
+        Top-of-atmosphere reflectance ``rho_toa``.
+    """
+    t_down = tdir_down + tdif_down
+    reflected = tdir_up * rho_s + tdif_up * rho_env
+    return rho_atm + t_down * reflected / (1 - sph_alb * rho_env)

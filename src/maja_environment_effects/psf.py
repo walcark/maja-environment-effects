@@ -1,4 +1,12 @@
-"""King PSF built from per-species (sigma, gamma) look-up tables."""
+"""King PSF built from per-species (sigma, gamma) look-up tables.
+
+For each specie, the PSF for specific atmospheric parameters is interpolated
+with a linear ND interpolator. The species-averaged PSF is then computed from
+the relative contribution of each aerosol to the full AOT.
+
+PSF are interpolated on their values rather than their parameters (sigma, gamma)
+because they are not linear.
+"""
 
 from itertools import product
 
