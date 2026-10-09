@@ -1290,7 +1290,7 @@ packages:
   license: Apache-2.0
   license_family: Apache
   purls:
-  - pkg:pypi/optree?source=compressed-mapping
+  - pkg:pypi/optree?source=hash-mapping
   run_exports: {}
   size: 596676
   timestamp: 1788504545165

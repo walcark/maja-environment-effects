@@ -10,9 +10,9 @@ Following is a table with comparing both methods:
 | -- | -- | -- |
 | Kernel | Gaussian | King [ref] |
 | Parameters | $\sigma$ | $\sigma, \gamma$ |
-| Variabilité | Non ($\sigma=1,\mathrm{km}$) | Oui, le kernel dépend de AOT, RH, $\lambda$ et du mélange d'aérosol |
-| Pré-traitement | Aucun | Oui, on doit calculer $P_\mathrm{5S}(\mathrm{AOT}, \mathrm{RH}, \lambda, \mathrm{Mélange d'aérosol})$ |
-| Convolution | Résolution : $240m$ <br> Taille : $15\times15$ <br> Padding : miroir <br> Méthode : spatiale | Résolution : $120m$ <br> Taille : $999\times999$ <br> Padding : miroir <br> Méthode : FFT linéaire avec padding miroir | 
+| Variabilité | No ($\sigma=1,\mathrm{km}$) | Yes, the kernel depends on the aerosol mix, AOT, RH and $\lambda$. |
+| Pré-traitement | None | Oui, we must compute $P_\mathrm{5S}(\mathrm{AOT}, \mathrm{RH}, \lambda, \mathrm{Mélange d'aérosol})$ |
+| Convolution | Resolution: $240m$ <br> Size: $15\times15$ <br> Padding: miror <br> Method: spatial | Resolution: $120m$ <br> Size: $999\times999$ <br> Padding: miror <br> Method : Linear FFT | 
 
 ## Description of the new environment effect correction
 
