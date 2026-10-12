@@ -1,14 +1,7 @@
 """Radiative terms of a scene, interpolated from the look-up table.
 
-MAJA reads them per pixel at the coarse resolution, from the aerosol optical
-thickness and the elevation of that pixel, so the interpolation is vectorised
-over the maps the product carries rather than evaluated at a tile average.
-
-The table holds one entry per aerosol species. Transmittances do not add
-across species, so the mixture is the fraction-weighted mean of the terms,
-which is first order in the optical thickness. It is the same approximation
-as reading a single pre-mixed aerosol model, and what it saves is one SMART-G
-run per date instead of one per species.
+See :func:`radiative_terms` for the interpolation and for the approximation
+the species mixture rests on.
 """
 
 import xarray as xr
@@ -50,6 +43,18 @@ def radiative_terms(
     dict[str, xr.DataArray]
         ``rho_atm``, ``tdir_down``, ``tdif_down``, ``tdir_up``, ``tdif_up``
         and ``sph_alb``, each over the dims of *aot*.
+
+    Notes
+    -----
+    MAJA reads these per pixel at the coarse resolution, so the
+    interpolation is vectorised over the maps the product carries rather
+    than evaluated at a tile average.
+
+    Transmittances do not add across species, so the mixture is taken as
+    the fraction-weighted mean of the terms, which is first order in the
+    optical thickness.  It is the same approximation as reading a single
+    pre-mixed aerosol model, and it saves one radiative transfer run per
+    date rather than one per species.
     """
     fractions = xr.DataArray(
         list(species.values()), coords={"species": list(species)}, dims="species"

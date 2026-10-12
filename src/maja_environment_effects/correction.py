@@ -29,6 +29,8 @@ def correct_scene(
     radiative_lut : xr.Dataset
         Look-up table of the radiative terms, see
         :func:`~maja_environment_effects.radiative.radiative_terms`.
+        A ``valid_mask`` variable on the scene, if present, keeps No_data
+        out of the convolution.
     device : torch.device or str, optional
         Device the computation runs on.
 
@@ -39,6 +41,12 @@ def correct_scene(
     """
     species = dict(
         zip(scene.species.values.tolist(), scene.species_fraction.values.tolist())
+    )
+    # No_data is left out of the convolution rather than counted as zero.
+    mask = (
+        torch.as_tensor(scene.valid_mask.values, dtype=torch.float32, device=device)
+        if "valid_mask" in scene
+        else None
     )
     res = float(scene.x[1] - scene.x[0])
     out: dict[str, list[torch.Tensor]] = {"rho_unif": [], "rho_env": [], "rho_s": []}
@@ -83,7 +91,7 @@ def correct_scene(
             get("tdif_up"),
             get("sph_alb"),
         )
-        rho_env = fft_convolve_2d(rho_unif, psf)
+        rho_env = fft_convolve_2d(rho_unif, psf, mask)
         rho_s = unif_to_surface(
             rho_unif, rho_env, get("tdir_up"), get("tdif_up"), get("sph_alb")
         )

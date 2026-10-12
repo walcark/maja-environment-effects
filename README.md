@@ -31,6 +31,7 @@ What the product carries (`data/scene.nc`):
 | `sza`, `vza` | scalar | degree | Solar and viewing zenith angles |
 | `wl` | `(band,)` | nm | Band central wavelength |
 | `species_fraction` | `(species,)` | - | Fraction of the AOT per aerosol species (CAMS), sums to 1 |
+| `valid_mask` | `(y, x)` | - | 1 on the usable pixels, 0 on No_data and edges. Optional |
 
 What the look-up tables carry:
 
@@ -97,6 +98,14 @@ $$
 \rho_\mathrm{env} = \rho_\mathrm{unif} \ast P_\mathrm{mean}
 $$
 
+With a `valid_mask` $m$, No_data is left out rather than counted as zero, which matters because the kernel spans the whole tile:
+
+$$
+\rho_\mathrm{env} = \frac{(m \, \rho_\mathrm{unif}) \ast P_\mathrm{mean}}{m \ast P_\mathrm{mean}}
+$$
+
+Both terms are the same convolution, so the FFT applies to both: three forward transforms instead of two, the kernel being transformed once. A pixel whose footprint holds no valid data comes back as No_data.
+
 3. Surface reflectance:
 
 $$
@@ -113,6 +122,7 @@ See `correct_scene` in `src/maja_environment_effects/correction.py`.
 pixi run python scripts/make_radiative_lut.py   # data/radiative.nc
 pixi run python scripts/make_scene.py           # data/scene.nc, rho_toa by 5S
 pixi run python scripts/demo.py                 # correct it, print the RMSE
+pixi run python scripts/check.py                # assert what must hold
 ```
 
 `make_scene.py` builds the scene forward: a surface reflectance, the maps of

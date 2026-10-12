@@ -1,17 +1,43 @@
-"""Linear 2D convolution computed in the Fourier domain.
-
-Pytorch allows for fast FFT transforms on either CPU or GPU.
-"""
+"""Linear 2D convolution in the Fourier domain, on CPU or GPU."""
 
 import torch
 import torch.nn.functional as F
 
+#: Below this weight, the kernel sees no valid pixel and the output is No_data.
+MIN_WEIGHT = 1e-6
 
-def fft_convolve_2d(image: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
+
+def _spectrum(kernel: torch.Tensor, ny: int, nx: int, h: int) -> torch.Tensor:
+    """Return the FFT of *kernel*, zero-padded to ``(ny, nx)`` and centred on 0."""
+    extended = F.pad(kernel, (0, nx - 2 * h - 1, 0, ny - 2 * h - 1))
+    return torch.fft.rfft2(extended.roll(shifts=(-h, -h), dims=(0, 1)))
+
+
+def _convolve(field: torch.Tensor, spectrum: torch.Tensor, h: int) -> torch.Tensor:
+    """Mirror-pad *field*, convolve it with *spectrum*, and crop back."""
+    padded = F.pad(field[None, None], (h, h, h, h), mode="reflect")[0, 0]
+    ny, nx = padded.shape
+    out = torch.fft.irfft2(torch.fft.rfft2(padded) * spectrum, s=(ny, nx))
+    return out[h : ny - h, h : nx - h]
+
+
+def fft_convolve_2d(
+    image: torch.Tensor,
+    kernel: torch.Tensor,
+    mask: torch.Tensor | None = None,
+) -> torch.Tensor:
     """Convolve an image with a centered kernel, using mirror padding.
 
-    The image is mirror-padded by ``k // 2`` on every side. The circular FFT
-    thus never wraps real pixels. The result is a true linear convolution.
+    The image is mirror-padded by ``k // 2`` on every side, so the circular
+    FFT never wraps real pixels and the result is a true linear convolution.
+
+    With a *mask*, invalid pixels are left out rather than counted as zero:
+    the convolution of ``image * mask`` is divided by the convolution of
+    ``mask``, which renormalises the kernel to the valid footprint. The
+    kernel spans the whole image here, so every output pixel integrates the
+    whole tile, and a tile half filled with No_data would otherwise halve
+    the result. Both fields are padded the same way, and a pixel whose
+    footprint holds no valid data comes back ``nan``.
 
     Parameters
     ----------
@@ -20,6 +46,8 @@ def fft_convolve_2d(image: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
     kernel : torch.Tensor
         2D kernel of odd shape ``(k, k)``, centered on ``(k // 2, k // 2)``.
         ``k // 2`` must be smaller than ``H`` and ``W``.
+    mask : torch.Tensor or None, optional
+        1 on the valid pixels and 0 elsewhere, same shape as *image*.
 
     Returns
     -------
@@ -27,13 +55,13 @@ def fft_convolve_2d(image: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
         Convolved image of shape ``(H, W)``.
     """
     h = kernel.shape[-1] // 2
-    padded = F.pad(image[None, None], (h, h, h, h), mode="reflect")[0, 0]
-    ny, nx = padded.shape
-    # Move the kernel center to the origin so the output is not shifted.
-    kernel_ext = F.pad(kernel, (0, nx - 2 * h - 1, 0, ny - 2 * h - 1))
-    kernel_ext = kernel_ext.roll(shifts=(-h, -h), dims=(0, 1))
-    out = torch.fft.irfft2(
-        torch.fft.rfft2(padded) * torch.fft.rfft2(kernel_ext),
-        s=(ny, nx),
+    spectrum = _spectrum(kernel, image.shape[0] + 2 * h, image.shape[1] + 2 * h, h)
+    if mask is None:
+        return _convolve(image, spectrum, h)
+    weighted = _convolve(image * mask, spectrum, h)
+    weight = _convolve(mask, spectrum, h)
+    return torch.where(
+        weight > MIN_WEIGHT,
+        weighted / weight.clamp_min(MIN_WEIGHT),
+        torch.nan,
     )
-    return out[h : ny - h, h : nx - h]

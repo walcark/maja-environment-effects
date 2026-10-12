@@ -1,16 +1,8 @@
-"""King PSF built from per-species (sigma, gamma) look-up tables.
+"""King PSF read from the per-species (sigma, gamma) look-up tables.
 
-For each specie, the PSF for specific atmospheric parameters is interpolated
-with a linear ND interpolator. The species-averaged PSF is then computed from
-the relative contribution of each aerosol to the full AOT.
-
-PSF are interpolated on their values rather than their parameters (sigma, gamma)
-because they are not linear.
-
-The tables deposited on SEDOO carry seven dimensions, of which three hold a
-single node: a solar zenith angle of 40 degrees, a nadir view, and an aerosol
-scale height of 2 km, the typical MAJA case.  The spectral band is read at its
-own node rather than interpolated, so what is interpolated is ``(aot, rh, h)``.
+The kernel is not linear in its parameters, so the kernels are interpolated
+rather than the parameters, and the species are weighted by their share of
+the aerosol optical thickness.  See :func:`mean_king_psf`.
 """
 
 from itertools import product
@@ -98,6 +90,14 @@ def mean_king_psf(
     -------
     torch.Tensor
         Kernel of shape ``(n, n)``, summing to 1.
+
+    Notes
+    -----
+    Of the seven axes the deposited tables carry, three hold a single node,
+    since this correction does not make them vary: a solar zenith angle of
+    40 degrees, a nadir view, and an aerosol scale height of 2 km.  The
+    spectral band is read at its own node rather than interpolated, so what
+    is interpolated is ``(aot, rh, h)``.
     """
     t = torch.linspace(-(n // 2) * res, (n // 2) * res, n, device=device)
     r2 = t[None, :] ** 2 + t[:, None] ** 2
