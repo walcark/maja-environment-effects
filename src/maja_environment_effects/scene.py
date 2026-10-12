@@ -15,3 +15,8 @@ def load_scene(path: Path = DATA_DIR / "scene.nc") -> xr.Dataset:
 def load_luts(directory: Path = DATA_DIR / "king") -> dict[str, xr.Dataset]:
     """Load one King PSF look-up table per species, keyed by file stem."""
     return {p.stem: xr.load_dataset(p) for p in sorted(directory.glob("*.nc"))}
+
+
+def load_radiative_lut(path: Path = DATA_DIR / "radiative.nc") -> xr.Dataset:
+    """Load the look-up table of the radiative terms, one entry per species."""
+    return xr.load_dataset(path)

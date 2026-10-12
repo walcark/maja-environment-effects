@@ -4,14 +4,20 @@ import numpy as np
 import torch
 
 from maja_environment_effects.correction import correct_scene
-from maja_environment_effects.scene import load_luts, load_scene
+from maja_environment_effects.scene import (
+    load_luts,
+    load_radiative_lut,
+    load_scene,
+)
 
 
 def main():
     # Load and correct the scene
     device = "cuda" if torch.cuda.is_available() else "cpu"
     scene = load_scene()
-    result = correct_scene(scene, load_luts(), device=device)
+    result = correct_scene(
+        scene, load_luts(), load_radiative_lut(), device=device
+    )
 
     # Print results
     print(f"{'band':<5} {'RMSE rho_unif':>14} {'RMSE rho_s':>11}")

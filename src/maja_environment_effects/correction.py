@@ -5,11 +5,13 @@ import xarray as xr
 
 from .convolution import fft_convolve_2d
 from .psf import mean_king_psf
+from .radiative import radiative_terms
 
 
 def correct_scene(
     scene: xr.Dataset,
     luts: dict[str, xr.Dataset],
+    radiative_lut: xr.Dataset,
     device: torch.device | str = "cpu",
 ) -> xr.Dataset:
     """Run ``rho_toa -> rho_unif -> rho_env -> rho_s`` on every band.
@@ -24,6 +26,9 @@ def correct_scene(
     luts : dict[str, xr.Dataset]
         King PSF look-up table per species, see
         :func:`~maja_environment_effects.psf.mean_king_psf`.
+    radiative_lut : xr.Dataset
+        Look-up table of the radiative terms, see
+        :func:`~maja_environment_effects.radiative.radiative_terms`.
     device : torch.device or str, optional
         Device the computation runs on.
 
@@ -39,9 +44,23 @@ def correct_scene(
     out: dict[str, list[torch.Tensor]] = {"rho_unif": [], "rho_env": [], "rho_s": []}
     for band in scene.band.values:
         ds = scene.sel(band=band)
+        # The radiative terms are interpolated per pixel, from the maps the
+        # product carries, as MAJA does at its coarse resolution.
+        terms = radiative_terms(
+            radiative_lut,
+            species,
+            wl=float(ds.wl),
+            aot=scene.aot,
+            h=scene.h,
+            sza=float(scene.sza),
+            vza=float(scene.vza),
+        )
 
         def get(name: str, ds: xr.Dataset = ds) -> torch.Tensor:
-            return torch.as_tensor(ds[name].values, dtype=torch.float32, device=device)
+            source = terms[name] if name in terms else ds[name]
+            return torch.as_tensor(
+                source.values, dtype=torch.float32, device=device
+            )
 
         psf = mean_king_psf(
             luts,
@@ -51,6 +70,8 @@ def correct_scene(
             wl=float(ds.wl),
             n=scene.sizes["x"],
             res=res,
+            # The tile average, as MAJA computes the PSF once per date.
+            h=float(scene.h.mean()),
             device=device,
         )
         rho_unif = toa_to_unif(

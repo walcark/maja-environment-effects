@@ -20,16 +20,37 @@ Following is a table with comparing both methods:
 
 | Name | Dimensions | Unit | Description |
 | -- | -- | -- | -- |
+What the product carries (`data/scene.nc`):
+
+| Name | Dimensions | Unit | Description |
+| -- | -- | -- | -- |
 | `rho_toa` | `(band, y, x)` | - | Top-of-atmosphere reflectance |
-| `rho_atm` | `(band, y, x)` | - | Atmospheric intrinsic reflectance |
-| `tdir_down`, `tdif_down` | `(band, y, x)` | - | Direct and diffuse downward transmittances |
-| `tdir_up`, `tdif_up` | `(band, y, x)` | - | Direct and diffuse upward transmittances |
-| `sph_alb` | `(band, y, x)` | - | Atmospheric spherical albedo |
 | `aot` | `(y, x)` | - | Aerosol optical thickness at 550 nm |
 | `rh` | `(y, x)` | % | Relative humidity |
+| `h` | `(y, x)` | km | Ground elevation |
+| `sza`, `vza` | scalar | degree | Solar and viewing zenith angles |
 | `wl` | `(band,)` | nm | Band central wavelength |
 | `species_fraction` | `(species,)` | - | Fraction of the AOT per aerosol species (CAMS), sums to 1 |
-| `sigma`, `gamma` | `(aot, rh, wl)`, one file per species | km, - | King PSF parameters look-up table (`data/king/<species>.nc`) |
+
+What the look-up tables carry:
+
+| Name | Dimensions | Unit | Description |
+| -- | -- | -- | -- |
+| `sigma`, `gamma` | `(band, sza, vza, h, href, rh, aot)`, one file per species | km, - | King PSF parameters (`data/king/<species>.nc`) |
+| `tdir`, `tdif` | `(species, band, aot, h, theta)` | - | Direct and diffuse transmittances, read at the solar angle downward and at the viewing angle upward (`data/radiative.nc`) |
+| `sph_alb` | `(species, band, aot, h)` | - | Atmospheric spherical albedo |
+| `rho_atm` | `(species, band, aot, h, sza, vza)` | - | Atmospheric intrinsic reflectance |
+
+The King tables are the ones deposited on the SEDOO portal. Three of their
+seven axes hold a single node, since this correction does not make them vary:
+a solar zenith angle of 40°, a nadir view, and an aerosol scale height of
+2 km. The spectral band is read at its own node rather than interpolated, so
+what is interpolated is `(aot, rh, h)`.
+
+The radiative table is synthetic, the single-scattering approximation over the
+same grid, which puts every term at a realistic order of magnitude. It is
+written by `scripts/make_radiative_lut.py` and nothing else changes when it is
+recomputed with a radiative transfer code.
 
 ### Output parameters
 
@@ -84,6 +105,22 @@ $$
 F = \frac{1 - S \rho_\mathrm{env}}{1 - S \rho_\mathrm{unif}}
 $$
 
-See `correct_scene` in `src/maja_environment_effects/correction.py`, and `scripts/demo.py` for an example on the synthetic scene.
+See `correct_scene` in `src/maja_environment_effects/correction.py`.
+
+### Running it
+
+```bash
+pixi run python scripts/make_radiative_lut.py   # data/radiative.nc
+pixi run python scripts/make_scene.py           # data/scene.nc, rho_toa by 5S
+pixi run python scripts/demo.py                 # correct it, print the RMSE
+```
+
+`make_scene.py` builds the scene forward: a surface reflectance, the maps of
+AOT, humidity and elevation, then `rho_toa` by the 5S formula, convolved with
+the King PSF of that atmosphere. `demo.py` reads the same two tables back and
+corrects it, so the residual is the error of the correction rather than a
+mismatch between two models. The radiative terms are interpolated per pixel
+from the maps of the product, as MAJA does; only the PSF uses the tile
+average.
 
 
