@@ -49,9 +49,9 @@ a solar zenith angle of 40°, a nadir view, and an aerosol scale height of
 what is interpolated is `(aot, rh, h)`.
 
 The radiative table is synthetic, the single-scattering approximation over the
-same grid, which puts every term at a realistic order of magnitude. It is
-written by `scripts/make_radiative_lut.py` and nothing else changes when it is
-recomputed with a radiative transfer code.
+same grid, which puts every term at a realistic order of magnitude. Nothing
+but the file itself changes when it is recomputed with a radiative transfer
+code.
 
 ### Output parameters
 
@@ -119,18 +119,15 @@ See `correct_scene` in `src/maja_environment_effects/correction.py`.
 ### Running it
 
 ```bash
-pixi run python scripts/make_radiative_lut.py   # data/radiative.nc
-pixi run python scripts/make_scene.py           # data/scene.nc, rho_toa by 5S
-pixi run python scripts/demo.py                 # correct it, print the RMSE
-pixi run python scripts/check.py                # assert what must hold
+pixi run python scripts/demo.py    # correct data/scene.nc, print the RMSE
+pixi run python scripts/check.py   # assert what the convolution guarantees
 ```
 
-`make_scene.py` builds the scene forward: a surface reflectance, the maps of
-AOT, humidity and elevation, then `rho_toa` by the 5S formula, convolved with
-the King PSF of that atmosphere. `demo.py` reads the same two tables back and
-corrects it, so the residual is the error of the correction rather than a
-mismatch between two models. The radiative terms are interpolated per pixel
-from the maps of the product, as MAJA does; only the PSF uses the tile
-average.
+`data/scene.nc` is a synthetic scene whose `rho_toa` was computed forward,
+from `rho_s` by the 5S formula convolved with the King PSF of its own
+atmosphere, so the residual `demo.py` prints is the error of the correction
+rather than a mismatch between two models. The radiative terms are
+interpolated per pixel from the maps of the product, as MAJA does; only the
+PSF uses the tile average.
 
 

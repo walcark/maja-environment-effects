@@ -28,16 +28,16 @@ def fft_convolve_2d(
 ) -> torch.Tensor:
     """Convolve an image with a centered kernel, using mirror padding.
 
-    The image is mirror-padded by ``k // 2`` on every side, so the circular
-    FFT never wraps real pixels and the result is a true linear convolution.
+    The image is mirror-padded by ``k // 2`` on each side, so the circular
+    convolution the FFT computes equals the linear convolution over the
+    image.
 
-    With a *mask*, invalid pixels are left out rather than counted as zero:
-    the convolution of ``image * mask`` is divided by the convolution of
-    ``mask``, which renormalises the kernel to the valid footprint. The
-    kernel spans the whole image here, so every output pixel integrates the
-    whole tile, and a tile half filled with No_data would otherwise halve
-    the result. Both fields are padded the same way, and a pixel whose
-    footprint holds no valid data comes back ``nan``.
+    With a *mask*, the result is the mean over the valid pixels: ``image *
+    mask`` convolved with the kernel, divided by ``mask`` convolved with the
+    same kernel. Without it a No_data pixel counts as a zero reflectance,
+    and since the kernel covers the whole image, every output pixel
+    integrates every No_data of the scene. Where the mask is zero over the
+    whole kernel, the output is ``nan``.
 
     Parameters
     ----------

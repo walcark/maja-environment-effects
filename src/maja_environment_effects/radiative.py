@@ -27,7 +27,7 @@ def radiative_terms(
     Parameters
     ----------
     lut : xr.Dataset
-        Table as written by ``scripts/make_radiative_lut.py``.
+        Table of ``data/radiative.nc``, one entry per aerosol species.
     species : dict[str, float]
         Species name to fraction of the aerosol optical thickness.
     wl : float
