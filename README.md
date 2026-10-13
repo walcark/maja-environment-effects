@@ -1,6 +1,6 @@
 ## Environment effects modelling within MAJA next
 
-This repository aims to provide a simple example of the new environment effects correction proposed for MAJA next. First, we explain the main differences between the old MAJA environment effects correction and our proposition. Then, we provide an example of the new correction process.
+This repository aims to provide a simple example of the new environment effects correction proposed for MAJA next.
 
 ## Installation
 
