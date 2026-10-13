@@ -124,6 +124,10 @@ pixi run python scripts/plot.py    # draw it, into figures/correction.png
 pixi run python scripts/check.py   # assert what the convolution guarantees
 ```
 
+The default environment runs on the CPU, which is all that is needed to read
+the code. `pixi run -e gpu python scripts/demo.py` brings the CUDA build of
+pytorch instead, and the scripts use it when it is there.
+
 `demo.py` prints the scene before correcting it, so what is being corrected is
 on screen:
 
@@ -136,6 +140,9 @@ rh        50.00 to 90.00 %, mean 69.04 %
 h         0.00 to 1.20 km, mean 0.45 km
 aerosol   sulphate 35%, organicm 20%, dust 15%, seasalt 10%, ...
 rho_toa   0.017 to 0.369, against 0.009 to 0.387 at the surface
+
+correcting on cpu   ... 6.5 s
+correcting on cuda  ... unavailable, this torch has no CUDA
 
 band   RMSE rho_unif  RMSE rho_s    gain
 B2           0.00208     0.00042    4.9x

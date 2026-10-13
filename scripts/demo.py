@@ -6,6 +6,8 @@ Prints what the scene holds, then the error of the retrieved reflectance with
 and without the correction.  ``scripts/plot.py`` draws the same thing.
 """
 
+import time
+
 import numpy as np
 import torch
 import xarray as xr
@@ -55,13 +57,20 @@ def describe(scene: xr.Dataset) -> None:
 
 
 def main() -> None:
-    """Describe the scene, correct it, and report the error per band."""
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    """Describe the scene, correct it on every device, report the error."""
     scene = load_scene()
     describe(scene)
 
-    print(f"\ncorrecting on {device} ...\n")
-    result = correct_scene(scene, load_luts(), load_radiative_lut(), device=device)
+    king, radiative = load_luts(), load_radiative_lut()
+    print()
+    for device in ("cpu", "cuda"):
+        if device == "cuda" and not torch.cuda.is_available():
+            print("correcting on cuda  ... unavailable, this torch has no CUDA")
+            continue
+        start = time.perf_counter()
+        result = correct_scene(scene, king, radiative, device=device)
+        print(f"correcting on {device:<5} ... {time.perf_counter() - start:.1f} s")
+    print()
 
     print(f"{'band':<5} {'RMSE rho_unif':>14} {'RMSE rho_s':>11} {'gain':>7}")
     for band in scene.band.values:
