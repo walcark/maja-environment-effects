@@ -13,7 +13,7 @@ from maja_environment_effects.convolution import fft_convolve_2d
 from maja_environment_effects.psf import mean_king_psf
 from maja_environment_effects.scene import load_luts
 
-N = 101
+N = 1999
 
 
 def check_mask_renormalises() -> None:

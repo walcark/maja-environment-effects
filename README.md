@@ -120,8 +120,38 @@ See `correct_scene` in `src/maja_environment_effects/correction.py`.
 
 ```bash
 pixi run python scripts/demo.py    # correct data/scene.nc, print the RMSE
+pixi run python scripts/plot.py    # draw it, into figures/correction.png
 pixi run python scripts/check.py   # assert what the convolution guarantees
 ```
+
+`demo.py` prints the scene before correcting it, so what is being corrected is
+on screen:
+
+```
+scene     915 x 915 pixels of 120 m, 109.8 km across
+bands     B2 (490 nm), B3 (560 nm), B4 (665 nm), B8 (842 nm)
+geometry  sza 35°, vza 5°
+aot       0.05 to 0.40, mean 0.27
+rh        50.00 to 90.00 %, mean 69.04 %
+h         0.00 to 1.20 km, mean 0.45 km
+aerosol   sulphate 35%, organicm 20%, dust 15%, seasalt 10%, ...
+rho_toa   0.017 to 0.369, against 0.009 to 0.387 at the surface
+
+band   RMSE rho_unif  RMSE rho_s    gain
+B2           0.00208     0.00042    4.9x
+B3           0.00173     0.00030    5.8x
+B4           0.00228     0.00029    7.9x
+B8           0.00501     0.00048   10.4x
+```
+
+`plot.py` draws one band, B4 by default:
+
+![Correction of B4](figures/correction.png)
+
+The error map before the correction carries the shape of the land cover: each
+patch bleeds into its neighbours over kilometres, which is the effect being
+corrected. After it, what remains is five to ten times smaller and no longer
+follows the boundaries.
 
 `data/scene.nc` is a synthetic scene whose `rho_toa` was computed forward,
 from `rho_s` by the 5S formula convolved with the King PSF of its own

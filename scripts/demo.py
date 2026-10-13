@@ -1,7 +1,14 @@
-"""Correct environment effects on the demo scene and compare to the truth."""
+"""Correct environment effects on the demo scene and compare to the truth.
+
+    pixi run python scripts/demo.py
+
+Prints what the scene holds, then the error of the retrieved reflectance with
+and without the correction.  ``scripts/plot.py`` draws the same thing.
+"""
 
 import numpy as np
 import torch
+import xarray as xr
 
 from maja_environment_effects.correction import correct_scene
 from maja_environment_effects.scene import (
@@ -11,23 +18,62 @@ from maja_environment_effects.scene import (
 )
 
 
-def main():
-    # Load and correct the scene
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    scene = load_scene()
-    result = correct_scene(
-        scene, load_luts(), load_radiative_lut(), device=device
+def describe(scene: xr.Dataset) -> None:
+    """Print the scene, so that what is being corrected is on screen."""
+    res = float(scene.x[1] - scene.x[0])
+    size = scene.sizes["x"]
+    print(
+        f"scene     {size} x {size} pixels of {res * 1000:.0f} m, "
+        f"{size * res:.1f} km across"
+    )
+    print(
+        "bands     "
+        + ", ".join(
+            f"{b} ({float(scene.wl.sel(band=b)):.0f} nm)"
+            for b in scene.band.values
+        )
+    )
+    print(f"geometry  sza {float(scene.sza):.0f}°, vza {float(scene.vza):.0f}°")
+    for name, unit in (("aot", ""), ("rh", " %"), ("h", " km")):
+        field = scene[name]
+        print(
+            f"{name:<9} {float(field.min()):.2f} to {float(field.max()):.2f}"
+            f"{unit}, mean {float(field.mean()):.2f}{unit}"
+        )
+    fractions = sorted(
+        zip(scene.species.values.tolist(), scene.species_fraction.values.tolist()),
+        key=lambda pair: -pair[1],
+    )
+    print(
+        "aerosol   " + ", ".join(f"{name} {share:.0%}" for name, share in fractions)
+    )
+    print(
+        f"rho_toa   {float(scene.rho_toa.min()):.3f} to "
+        f"{float(scene.rho_toa.max()):.3f}, against {float(scene.rho_s.min()):.3f} "
+        f"to {float(scene.rho_s.max()):.3f} at the surface"
     )
 
-    # Print results
-    print(f"{'band':<5} {'RMSE rho_unif':>14} {'RMSE rho_s':>11}")
+
+def main() -> None:
+    """Describe the scene, correct it, and report the error per band."""
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    scene = load_scene()
+    describe(scene)
+
+    print(f"\ncorrecting on {device} ...\n")
+    result = correct_scene(scene, load_luts(), load_radiative_lut(), device=device)
+
+    print(f"{'band':<5} {'RMSE rho_unif':>14} {'RMSE rho_s':>11} {'gain':>7}")
     for band in scene.band.values:
         truth = scene.rho_s.sel(band=band).values
         rmse = [
             np.sqrt(np.mean((result[v].sel(band=band).values - truth) ** 2))
             for v in ("rho_unif", "rho_s")
         ]
-        print(f"{band:<5} {rmse[0]:>14.5f} {rmse[1]:>11.5f}")
+        print(
+            f"{band:<5} {rmse[0]:>14.5f} {rmse[1]:>11.5f} "
+            f"{rmse[0] / rmse[1]:>6.1f}x"
+        )
 
 
 if __name__ == "__main__":
