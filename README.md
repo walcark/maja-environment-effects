@@ -75,8 +75,6 @@ where $f_s$ is the AOT fraction of species $s$, $\mathcal{C}_s$ the 8 nodes of t
 
 ### Atmospheric correction
 
-For each band, with $T^\uparrow = t_\mathrm{dir}^\uparrow + t_\mathrm{dif}^\uparrow$ and $T^\downarrow = t_\mathrm{dir}^\downarrow + t_\mathrm{dif}^\downarrow$:
-
 1. Uniform surface reflectance, inverting the 5S model with $\rho_s = \rho_\mathrm{env}$:
 
 $$
@@ -102,9 +100,9 @@ Both terms are the same convolution, so the FFT applies to both: three forward t
 3. Surface reflectance:
 
 $$
-\rho_s = \frac{\rho_\mathrm{unif}  T^\uparrow  F - \rho_\mathrm{env} t_\mathrm{dif}^\uparrow}{t_\mathrm{dir}^\uparrow}
+\rho_s = \frac{\rho_\mathrm{unif}  T^\uparrow  F - \rho_\mathrm{env} T_\mathrm{dif}^\uparrow}{T_\mathrm{dir}^\uparrow}
 \qquad
-F = \frac{1 - S \rho_\mathrm{env}}{1 - S \rho_\mathrm{unif}}
+F = \frac{1 - s \rho_\mathrm{env}}{1 - s \rho_\mathrm{unif}}
 $$
 
 See `correct_scene` in `src/maja_environment_effects/correction.py`.
