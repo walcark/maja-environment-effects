@@ -4,9 +4,7 @@ This repository aims to provide a simple example of the new environment effects 
 
 ## Installation
 
-Two environments. The default one runs on the CPU, which is all that is needed
-to read the code and to correct a tile; `gpu` brings the CUDA build of pytorch
-instead, and the scripts use it when it is there.
+There are two environments. The default one runs on the CPU, which is all that is needed to read the code and to correct a tile. The second one runs on the GPU and brings the CUDA build of pytorch instead, and the scripts use it when it is there.
 
 ```bash
 pixi install            # the default, CPU only
@@ -27,8 +25,7 @@ pixi run -e gpu python scripts/demo.py      # on the GPU
 pixi run python scripts/plot.py B8          # another band
 ```
 
-`demo.py` prints the scene before correcting it, so what is being corrected is
-on screen:
+`demo.py` prints the scene before correcting it, so what is being corrected is on screen:
 
 ```
 scene     915 x 915 pixels of 120 m, 109.8 km across
@@ -51,38 +48,26 @@ B4           0.00228     0.00029    7.9x
 B8           0.00501     0.00048   10.4x
 ```
 
-The convolution is timed on its own, since it is what the new correction adds
-over the old one: a kernel the size of the image rather than 15 x 15. Eighty
-milliseconds per band on a CPU, thirty on a GPU, against about 1.5 s per band
-for interpolating the radiative terms over the same maps. The cost of the
-method is not where one would expect it.
+The convolution is timed on its own, since it is what the new correction adds over the old one: a kernel the size of the image rather than 15 x 15. Eighty milliseconds per band on a CPU, thirty on a GPU. There is no real interest in using the GPU for a 915 x 915 grid. IT may however become interesting for higher resolutions.
 
 `plot.py` draws one band, B4 by default:
 
 ![Correction of B4](figures/correction.png)
 
-The error map before the correction carries the shape of the land cover: each
-patch bleeds into its neighbours over kilometres, which is the effect being
-corrected. After it, what remains is five to ten times smaller and no longer
-follows the boundaries.
+The error map before the correction carries the shape of the land cover: each patch bleeds into its neighbours over kilometres, which is the effect being corrected. After it, what remains is five to ten times smaller and no longer follows the boundaries.
 
-`data/scene.nc` is a synthetic scene whose `rho_toa` was computed forward,
-from `rho_s` by the 5S formula convolved with the King PSF of its own
-atmosphere, so the residual `demo.py` prints is the error of the correction
-rather than a mismatch between two models. The radiative terms are
-interpolated per pixel from the maps of the product, as MAJA does; only the
-PSF uses the tile average.
+`data/scene.nc` is a synthetic scene whose `rho_toa` was computed forward, from `rho_s` by the 5S formula convolved with the King PSF of its own atmosphere, so the residual `demo.py` prints is the error of the correction rather than a mismatch between two models. The radiative terms are interpolated per pixel from the maps of the product, as MAJA does; only the PSF uses the tile average.
 
 
 ### Comparison of the `old` and `new` environment effect correction
 
-Following is a table with comparing both methods:
+Following is a table comparing both methods:
 
 | | Old | New |
 | -- | -- | -- |
 | Kernel | Gaussian | King [ref] |
 | Parameters | $\sigma$ | $\sigma, \gamma$ |
-| Variabilité | No ($\sigma=1,\mathrm{km}$) | Yes, the kernel depends on the aerosol mix, AOT, RH and $\lambda$. |
+| Variabilité | No ($\sigma=1 \mathrm{km}$) | Yes, the kernel depends on the aerosol mix, AOT, RH and $\lambda$. |
 | Pré-traitement | None | Oui, we must compute $P_\mathrm{5S}(\mathrm{AOT}, \mathrm{RH}, \lambda, \mathrm{Mélange d'aérosol})$ |
 | Convolution | Resolution: $240m$ <br> Size: $15\times15$ <br> Padding: miror <br> Method: spatial | Resolution: $120m$ <br> Size: $915\times915$ <br> Padding: miror <br> Method : Linear FFT | 
 
@@ -90,9 +75,7 @@ Following is a table with comparing both methods:
 
 ### Input parameters
 
-| Name | Dimensions | Unit | Description |
-| -- | -- | -- | -- |
-What the product carries (`data/scene.nc`):
+This table describes what the input product carries (see `data/scene.nc` in the codebase):
 
 | Name | Dimensions | Unit | Description |
 | -- | -- | -- | -- |
@@ -105,7 +88,7 @@ What the product carries (`data/scene.nc`):
 | `species_fraction` | `(species,)` | - | Fraction of the AOT per aerosol species (CAMS), sums to 1 |
 | `valid_mask` | `(y, x)` | - | 1 on the usable pixels, 0 on No_data and edges. Optional |
 
-What the look-up tables carry:
+This table describes what the look-up tables carry (radiative parameters + PSF parameters):
 
 | Name | Dimensions | Unit | Description |
 | -- | -- | -- | -- |
@@ -114,18 +97,13 @@ What the look-up tables carry:
 | `sph_alb` | `(species, band, aot, h)` | - | Atmospheric spherical albedo |
 | `rho_atm` | `(species, band, aot, h, sza, vza)` | - | Atmospheric intrinsic reflectance |
 
-The King tables are the ones deposited on the SEDOO portal. Three of their
-seven axes hold a single node, since this correction does not make them vary:
-a solar zenith angle of 40°, a nadir view, and an aerosol scale height of
-2 km. The spectral band is read at its own node rather than interpolated, so
-what is interpolated is `(aot, rh, h)`.
+The King tables are the ones deposited on the SEDOO portal. Two of their seven axes hold a single node, since this correction does not make them vary: a solar zenith angle of 40° and a nadir view. The aerosol height scale is set to 2 km, even though it impact the PSF shape, because MAJA has no possibility to infer it from external data. The spectral band is read at its own node rather than interpolated, so what is interpolated is `(aot, rh, h)`.
 
-The radiative table is synthetic, the single-scattering approximation over the
-same grid, which puts every term at a realistic order of magnitude. Nothing
-but the file itself changes when it is recomputed with a radiative transfer
-code.
+**Note:** The radiative table is synthetic. It is supposed to represent realistic radiative values, only for the sake of this example.
 
 ### Output parameters
+
+This table describes what data the code produce:
 
 | Name | Dimensions | Unit | Description |
 | -- | -- | -- | -- |
@@ -136,7 +114,7 @@ code.
 
 ### Pre-processing
 
-One PSF is computed per band, for the scene-mean atmosphere $(\overline{\mathrm{AOT}}, \overline{\mathrm{RH}}, \lambda)$, on a grid of the image size ($915 \times 915$ at $120\,m$). The normalised King kernel is:
+One PSF is computed per band, for the scene-mean atmosphere $(\overline{\mathrm{AOT}}, \overline{\mathrm{RH}}, \lambda)$, on a grid of the image size ($915 \times 915$ at $120m$). The normalised King kernel is:
 
 $$
 \hat{K}_{\sigma,\gamma}(r) = \frac{K_{\sigma,\gamma}(r)}{\sum_{\mathrm{grid}} K_{\sigma,\gamma}},
@@ -147,14 +125,12 @@ $$
 The kernel is not linear in $(\sigma, \gamma)$, so the parameters are never interpolated: kernels are evaluated at the LUT nodes and interpolated linearly, like the species mixture:
 
 $$
-P_\mathrm{mean} = \sum_{s \in \mathrm{species}} f_s \sum_{c \in \mathcal{C}_s} w_c \, \hat{K}_{\sigma_s(c), \gamma_s(c)}
+P_\mathrm{mean} = \sum_{s \in \mathrm{species}} f_s \sum_{c \in \mathcal{C}_s} w_c  \hat{K}_{\sigma_s(c), \gamma_s(c)}
 $$
 
 where $f_s$ is the AOT fraction of species $s$, $\mathcal{C}_s$ the 8 nodes of the LUT of $s$ surrounding $(\overline{\mathrm{AOT}}, \overline{\mathrm{RH}}, \lambda)$ and $w_c$ their trilinear weights. Kernels are accumulated in place (`psf += weight * kernel`), so the peak memory is three $n \times n$ buffers whatever the number of species. See `mean_king_psf` in `src/maja_environment_effects/psf.py`.
 
 ### Atmospheric correction
-
-For each band, with $T_\mathrm{up} = t^\mathrm{dir}_\mathrm{up} + t^\mathrm{dif}_\mathrm{up}$ and $T_\mathrm{down} = t^\mathrm{dir}_\mathrm{down} + t^\mathrm{dif}_\mathrm{down}$:
 
 1. Uniform surface reflectance, inverting the 5S model with $\rho_s = \rho_\mathrm{env}$:
 
@@ -173,7 +149,7 @@ $$
 With a `valid_mask` $m$, No_data is left out rather than counted as zero, which matters because the kernel spans the whole tile:
 
 $$
-\rho_\mathrm{env} = \frac{(m \, \rho_\mathrm{unif}) \ast P_\mathrm{mean}}{m \ast P_\mathrm{mean}}
+\rho_\mathrm{env} = \frac{(m  \rho_\mathrm{unif}) \ast P_\mathrm{mean}}{m \ast P_\mathrm{mean}}
 $$
 
 Both terms are the same convolution, so the FFT applies to both: three forward transforms instead of two, the kernel being transformed once. A pixel whose footprint holds no valid data comes back as No_data.
@@ -181,10 +157,9 @@ Both terms are the same convolution, so the FFT applies to both: three forward t
 3. Surface reflectance:
 
 $$
-\rho_s = \frac{\rho_\mathrm{unif} \, T_\mathrm{up} \, F - \rho_\mathrm{env} \, t^{\mathrm{dif}}_{\mathrm{up}}}{t^{\mathrm{dir}}_{\mathrm{up}}},
+\rho_s = \frac{\rho_\mathrm{unif}  T^\uparrow  F - \rho_\mathrm{env} T_\mathrm{dif}^\uparrow}{T_\mathrm{dir}^\uparrow}
 \qquad
-F = \frac{1 - S \rho_\mathrm{env}}{1 - S \rho_\mathrm{unif}}
+F = \frac{1 - s \rho_\mathrm{env}}{1 - s \rho_\mathrm{unif}}
 $$
 
 See `correct_scene` in `src/maja_environment_effects/correction.py`.
-
