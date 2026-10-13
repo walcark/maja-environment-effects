@@ -40,8 +40,9 @@ h         0.00 to 1.20 km, mean 0.45 km
 aerosol   sulphate 35%, organicm 20%, dust 15%, seasalt 10%, ...
 rho_toa   0.017 to 0.369, against 0.009 to 0.387 at the surface
 
-correcting on cpu   ... 6.6 s
-correcting on cuda  ... 5.8 s
+FFT convolution of 915 x 915 by 915 x 915:
+  cpu   0.08 s
+  cuda  0.03 s
 
 band   RMSE rho_unif  RMSE rho_s    gain
 B2           0.00208     0.00042    4.9x
@@ -50,11 +51,11 @@ B4           0.00228     0.00029    7.9x
 B8           0.00501     0.00048   10.4x
 ```
 
-The two devices land within a second of each other, because what dominates is
-not the convolution: per band, interpolating the radiative terms over the
-915 x 915 maps takes about 1.5 s on the host, against 0.2 s for the kernel and
-the three transforms. The device only matters for a scene much larger than a
-Sentinel-2 tile.
+The convolution is timed on its own, since it is what the new correction adds
+over the old one: a kernel the size of the image rather than 15 x 15. Eighty
+milliseconds per band on a CPU, thirty on a GPU, against about 1.5 s per band
+for interpolating the radiative terms over the same maps. The cost of the
+method is not where one would expect it.
 
 `plot.py` draws one band, B4 by default:
 

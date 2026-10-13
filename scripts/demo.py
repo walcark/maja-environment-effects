@@ -12,7 +12,9 @@ import numpy as np
 import torch
 import xarray as xr
 
+from maja_environment_effects.convolution import fft_convolve_2d
 from maja_environment_effects.correction import correct_scene
+from maja_environment_effects.psf import mean_king_psf
 from maja_environment_effects.scene import (
     load_luts,
     load_radiative_lut,
@@ -67,22 +69,58 @@ def warm_up(device: str) -> None:
         torch.cuda.synchronize()
 
 
+def benchmark(scene: xr.Dataset, king: dict[str, xr.Dataset], repeats: int = 3) -> None:
+    """Time the FFT convolution alone, on every device available.
+
+    The kernel is the size of the image, so this is the cost the new
+    correction adds over the old one, and the only part of the chain the
+    device changes.
+    """
+    size = scene.sizes["x"]
+    kernel = mean_king_psf(
+        king,
+        dict(zip(scene.species.values.tolist(),
+                 scene.species_fraction.values.tolist())),
+        aot=float(scene.aot.mean()),
+        rh=float(scene.rh.mean()),
+        wl=float(scene.wl[0]),
+        n=size,
+        res=float(scene.x[1] - scene.x[0]),
+        h=float(scene.h.mean()),
+    )
+    image = torch.as_tensor(
+        scene.rho_toa.isel(band=0).values, dtype=torch.float32
+    )
+    print(f"\nFFT convolution of {size} x {size} by {size} x {size}:")
+    for device in ("cpu", "cuda"):
+        if device == "cuda" and not torch.cuda.is_available():
+            print(f"  {device:<5} unavailable, this torch has no CUDA")
+            continue
+        warm_up(device)
+        on_device = (image.to(device), kernel.to(device))
+        start = time.perf_counter()
+        for _ in range(repeats):
+            fft_convolve_2d(*on_device)
+        if device == "cuda":
+            torch.cuda.synchronize()
+        print(f"  {device:<5} {(time.perf_counter() - start) / repeats:.2f} s")
+    print()
+
+
 def main() -> None:
     """Describe the scene, correct it on every device, report the error."""
     scene = load_scene()
     describe(scene)
 
     king, radiative = load_luts(), load_radiative_lut()
-    print()
-    for device in ("cpu", "cuda"):
-        if device == "cuda" and not torch.cuda.is_available():
-            print("correcting on cuda  ... unavailable, this torch has no CUDA")
-            continue
-        warm_up(device)
-        start = time.perf_counter()
-        result = correct_scene(scene, king, radiative, device=device)
-        print(f"correcting on {device:<5} ... {time.perf_counter() - start:.1f} s")
-    print()
+    benchmark(scene, king)
+
+    result = correct_scene(
+        scene,
+        king,
+        radiative,
+        device="cuda" if torch.cuda.is_available() else "cpu",
+    )
 
     print(f"{'band':<5} {'RMSE rho_unif':>14} {'RMSE rho_s':>11} {'gain':>7}")
     for band in scene.band.values:
