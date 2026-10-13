@@ -117,5 +117,7 @@ def mean_king_psf(
             sigma, gamma = float(params.sigma), float(params.gamma)
             torch.div(r2, 2.0 * sigma**2 * gamma, out=tmp)
             tmp.add_(1.0).pow_(-gamma)
-            acc.add_(tmp, alpha=weight / tmp.sum().item())
+            # The sum stays on the device: reading it back would synchronise
+            # once per node, which costs more than the node itself on a GPU.
+            acc.add_(tmp.div_(tmp.sum()).mul_(weight))
     return acc

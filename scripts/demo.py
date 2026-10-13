@@ -56,6 +56,17 @@ def describe(scene: xr.Dataset) -> None:
     )
 
 
+def warm_up(device: str) -> None:
+    """Pay the one-shot cost of the device before the timer starts.
+
+    The first CUDA call builds a context and compiles the FFT plans, which
+    takes longer than the correction itself and says nothing about it.
+    """
+    torch.fft.rfft2(torch.zeros(8, 8, device=device))
+    if device == "cuda":
+        torch.cuda.synchronize()
+
+
 def main() -> None:
     """Describe the scene, correct it on every device, report the error."""
     scene = load_scene()
@@ -67,6 +78,7 @@ def main() -> None:
         if device == "cuda" and not torch.cuda.is_available():
             print("correcting on cuda  ... unavailable, this torch has no CUDA")
             continue
+        warm_up(device)
         start = time.perf_counter()
         result = correct_scene(scene, king, radiative, device=device)
         print(f"correcting on {device:<5} ... {time.perf_counter() - start:.1f} s")

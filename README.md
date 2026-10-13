@@ -2,6 +2,77 @@
 
 This repository aims to provide a simple example of the new environment effects correction proposed for MAJA next. First, we explain the main differences between the old MAJA environment effects correction and our proposition. Then, we provide an example of the new correction process.
 
+## Installation
+
+Two environments. The default one runs on the CPU, which is all that is needed
+to read the code and to correct a tile; `gpu` brings the CUDA build of pytorch
+instead, and the scripts use it when it is there.
+
+```bash
+pixi install            # the default, CPU only
+pixi install -e gpu     # the CUDA build, optional
+```
+
+## Running it
+
+| Script | What it does |
+| -- | -- |
+| `scripts/demo.py` | describes `data/scene.nc`, corrects it, prints the error per band |
+| `scripts/plot.py` | draws one band and the PSF, into `figures/correction.png` |
+| `scripts/check.py` | asserts what the convolution and the kernel must guarantee |
+
+```bash
+pixi run python scripts/demo.py             # on the CPU
+pixi run -e gpu python scripts/demo.py      # on the GPU
+pixi run python scripts/plot.py B8          # another band
+```
+
+`demo.py` prints the scene before correcting it, so what is being corrected is
+on screen:
+
+```
+scene     915 x 915 pixels of 120 m, 109.8 km across
+bands     B2 (490 nm), B3 (560 nm), B4 (665 nm), B8 (842 nm)
+geometry  sza 35°, vza 5°
+aot       0.05 to 0.40, mean 0.27
+rh        50.00 to 90.00 %, mean 69.04 %
+h         0.00 to 1.20 km, mean 0.45 km
+aerosol   sulphate 35%, organicm 20%, dust 15%, seasalt 10%, ...
+rho_toa   0.017 to 0.369, against 0.009 to 0.387 at the surface
+
+correcting on cpu   ... 6.6 s
+correcting on cuda  ... 5.8 s
+
+band   RMSE rho_unif  RMSE rho_s    gain
+B2           0.00208     0.00042    4.9x
+B3           0.00173     0.00030    5.8x
+B4           0.00228     0.00029    7.9x
+B8           0.00501     0.00048   10.4x
+```
+
+The two devices land within a second of each other, because what dominates is
+not the convolution: per band, interpolating the radiative terms over the
+915 x 915 maps takes about 1.5 s on the host, against 0.2 s for the kernel and
+the three transforms. The device only matters for a scene much larger than a
+Sentinel-2 tile.
+
+`plot.py` draws one band, B4 by default:
+
+![Correction of B4](figures/correction.png)
+
+The error map before the correction carries the shape of the land cover: each
+patch bleeds into its neighbours over kilometres, which is the effect being
+corrected. After it, what remains is five to ten times smaller and no longer
+follows the boundaries.
+
+`data/scene.nc` is a synthetic scene whose `rho_toa` was computed forward,
+from `rho_s` by the 5S formula convolved with the King PSF of its own
+atmosphere, so the residual `demo.py` prints is the error of the correction
+rather than a mismatch between two models. The radiative terms are
+interpolated per pixel from the maps of the product, as MAJA does; only the
+PSF uses the tile average.
+
+
 ### Comparison of the `old` and `new` environment effect correction
 
 Following is a table with comparing both methods:
@@ -12,7 +83,7 @@ Following is a table with comparing both methods:
 | Parameters | $\sigma$ | $\sigma, \gamma$ |
 | Variabilité | No ($\sigma=1,\mathrm{km}$) | Yes, the kernel depends on the aerosol mix, AOT, RH and $\lambda$. |
 | Pré-traitement | None | Oui, we must compute $P_\mathrm{5S}(\mathrm{AOT}, \mathrm{RH}, \lambda, \mathrm{Mélange d'aérosol})$ |
-| Convolution | Resolution: $240m$ <br> Size: $15\times15$ <br> Padding: miror <br> Method: spatial | Resolution: $120m$ <br> Size: $999\times999$ <br> Padding: miror <br> Method : Linear FFT | 
+| Convolution | Resolution: $240m$ <br> Size: $15\times15$ <br> Padding: miror <br> Method: spatial | Resolution: $120m$ <br> Size: $915\times915$ <br> Padding: miror <br> Method : Linear FFT | 
 
 ## Description of the new environment effect correction
 
@@ -115,56 +186,4 @@ F = \frac{1 - S \rho_\mathrm{env}}{1 - S \rho_\mathrm{unif}}
 $$
 
 See `correct_scene` in `src/maja_environment_effects/correction.py`.
-
-### Running it
-
-```bash
-pixi run python scripts/demo.py    # correct data/scene.nc, print the RMSE
-pixi run python scripts/plot.py    # draw it, into figures/correction.png
-pixi run python scripts/check.py   # assert what the convolution guarantees
-```
-
-The default environment runs on the CPU, which is all that is needed to read
-the code. `pixi run -e gpu python scripts/demo.py` brings the CUDA build of
-pytorch instead, and the scripts use it when it is there.
-
-`demo.py` prints the scene before correcting it, so what is being corrected is
-on screen:
-
-```
-scene     915 x 915 pixels of 120 m, 109.8 km across
-bands     B2 (490 nm), B3 (560 nm), B4 (665 nm), B8 (842 nm)
-geometry  sza 35°, vza 5°
-aot       0.05 to 0.40, mean 0.27
-rh        50.00 to 90.00 %, mean 69.04 %
-h         0.00 to 1.20 km, mean 0.45 km
-aerosol   sulphate 35%, organicm 20%, dust 15%, seasalt 10%, ...
-rho_toa   0.017 to 0.369, against 0.009 to 0.387 at the surface
-
-correcting on cpu   ... 6.5 s
-correcting on cuda  ... unavailable, this torch has no CUDA
-
-band   RMSE rho_unif  RMSE rho_s    gain
-B2           0.00208     0.00042    4.9x
-B3           0.00173     0.00030    5.8x
-B4           0.00228     0.00029    7.9x
-B8           0.00501     0.00048   10.4x
-```
-
-`plot.py` draws one band, B4 by default:
-
-![Correction of B4](figures/correction.png)
-
-The error map before the correction carries the shape of the land cover: each
-patch bleeds into its neighbours over kilometres, which is the effect being
-corrected. After it, what remains is five to ten times smaller and no longer
-follows the boundaries.
-
-`data/scene.nc` is a synthetic scene whose `rho_toa` was computed forward,
-from `rho_s` by the 5S formula convolved with the King PSF of its own
-atmosphere, so the residual `demo.py` prints is the error of the correction
-rather than a mismatch between two models. The radiative terms are
-interpolated per pixel from the maps of the product, as MAJA does; only the
-PSF uses the tile average.
-
 
